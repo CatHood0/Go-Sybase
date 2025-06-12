@@ -5,11 +5,6 @@ import (
 	"fmt"
 )
 
-func escapeJSON(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b[1 : len(b)-1]) // Elimina las comillas exteriores
-}
-
 func mapToStruct[T any](value map[string]any) (*T, error) {
 	var target T
 	jsonData, err := json.Marshal(value)
