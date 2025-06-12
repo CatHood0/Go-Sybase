@@ -1,4 +1,4 @@
-package gosybase
+package sybase
 
 import (
 	"io"
@@ -9,7 +9,7 @@ import (
 
 // Sybase representa una conexión a una base de datos Sybase mediante un puente Java.
 // Gestiona un pool de conexiones, transacciones y la comunicación con el proceso Java.
-type sybase struct {
+type Sybase struct {
 	// Configuración básica de conexión
 	host     string // Dirección IP/hostname del servidor Sybase
 	port     string // Puerto de conexión (ej: "5000")
@@ -61,7 +61,7 @@ type Config struct {
 	TransactionConnections int
 	Logs                   bool
 	TdsLink                string
-	tdsProperties          string
+	TdsProperties          string
 	Timeout                time.Duration
 }
 

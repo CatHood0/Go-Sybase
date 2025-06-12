@@ -1,9 +1,9 @@
-package gosybase
+package sybase
 
 import ()
 
 type Transaction struct {
-	Db        *sybase
+	Db        *Sybase
 	TxID      int
 	Finalized bool
 }

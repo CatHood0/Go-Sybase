@@ -4,25 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"log"
+
+	sybase "github.com/CatHood0/Go-Sybase/internal"
 )
 
 type Database struct {
-	db        *sybase
+	db        *sybase.Sybase
 	Connected bool
 }
 
 func Connect(propertiesPath string, log bool, customTdsLink string) (*Database, error) {
-	sybaseDatabase, err := newConnectionInstance(Config{
+	sybaseDatabase, err := sybase.NewConnectionInstance(sybase.Config{
 		Logs:          log,
 		TdsLink:       customTdsLink,
-		tdsProperties: propertiesPath,
+		TdsProperties: propertiesPath,
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	connErr := sybaseDatabase.connect()
+	connErr := sybaseDatabase.Connect()
 
 	if connErr != nil {
 		sybaseDatabase = nil
@@ -35,14 +37,14 @@ func Connect(propertiesPath string, log bool, customTdsLink string) (*Database, 
 	}, nil
 }
 
-func ConnectWithConfigs(serverConfig Config) (*Database, error) {
-	sybaseDatabase, err := newConnectionInstance(serverConfig)
+func ConnectWithConfigs(serverConfig sybase.Config) (*Database, error) {
+	sybaseDatabase, err := sybase.NewConnectionInstance(serverConfig)
 
 	if err != nil {
 		return nil, err
 	}
 
-	connErr := sybaseDatabase.connect()
+	connErr := sybaseDatabase.Connect()
 
 	if connErr != nil {
 		sybaseDatabase = nil
@@ -54,12 +56,12 @@ func ConnectWithConfigs(serverConfig Config) (*Database, error) {
 	}, nil
 }
 
-func (ds *Database) RawQuery(query string) (*RawResponse, error) {
+func (ds *Database) RawQuery(query string) (*sybase.RawResponse, error) {
 	if !ds.Connected {
 		return nil, errors.New("Database isn't connected")
 	}
 
-	response, err := ds.db.raw(query)
+	response, err := ds.db.Raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -72,7 +74,7 @@ func (ds *Database) RawQuery(query string) (*RawResponse, error) {
 func (ds *Database) QueryFirst(query string) (map[string]any, error) {
 	data := map[string]any{}
 
-	response, err := ds.db.raw(query)
+	response, err := ds.db.Raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -92,7 +94,7 @@ func (ds *Database) Query(query string, callback func(map[string]any) error) err
 	if !ds.Connected {
 		return errors.New("Database isn't connected")
 	}
-	response, err := ds.db.raw(query)
+	response, err := ds.db.Raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -113,7 +115,7 @@ func (ds *Database) Exec(query string) (any, error) {
 	if !ds.Connected {
 		return nil, errors.New("Database isn't connected")
 	}
-	value, err := ds.db.raw(query)
+	value, err := ds.db.Raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -123,7 +125,8 @@ func (ds *Database) Exec(query string) (any, error) {
 	return value, nil
 }
 
-func (ds *Database) Disconnect() {
-	ds.db.disconnect()
+func (ds *Database) Disconnect() error {
+	err := ds.db.Disconnect()
 	ds.Connected = false
+	return err
 }

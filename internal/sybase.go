@@ -1,4 +1,4 @@
-package gosybase
+package sybase
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func newConnectionInstance(config Config) (*sybase, error) {
+func NewConnectionInstance(config Config) (*Sybase, error) {
 	var tdsJarPath *string = &config.TdsLink
 
 	if config.TdsLink == "" {
@@ -21,7 +21,7 @@ func newConnectionInstance(config Config) (*sybase, error) {
 		}
 	}
 
-	return &sybase{
+	return &Sybase{
 		host:                   config.Host,
 		port:                   config.Port,
 		database:               config.Database,
@@ -41,7 +41,7 @@ func newConnectionInstance(config Config) (*sybase, error) {
 	}, nil
 }
 
-func (s *sybase) connect() error {
+func (s *Sybase) Connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -50,9 +50,9 @@ func (s *sybase) connect() error {
 	}
 
 	var cmd *exec.Cmd
-	if s.config.tdsProperties != "" && checkFileExistence(s.config.tdsProperties) {
-		// tdsProperties already have all the necessary configurations
-		cmd = exec.Command("java", "-jar", s.tdsJarPath, s.config.tdsProperties)
+	if s.config.TdsProperties != "" && checkFileExistence(s.config.TdsProperties) {
+		// TdsProperties already have all the necessary configurations
+		cmd = exec.Command("java", "-jar", s.tdsJarPath, s.config.TdsProperties)
 	} else {
 		cmd = exec.Command("java", "-jar", s.tdsJarPath,
 			s.host, s.port, s.database, s.username, s.password, strconv.FormatBool(s.logs), strconv.Itoa(s.minConnections), strconv.Itoa(s.maxConnections), strconv.Itoa(s.connectionTimeout), strconv.Itoa(s.idleTimeout), strconv.Itoa(s.keepaliveTime), strconv.Itoa(s.maxLifetime), strconv.Itoa(s.transactionConnections))
@@ -109,9 +109,9 @@ func (s *sybase) connect() error {
 	return nil
 }
 
-func (s *sybase) disconnect() {
+func (s *Sybase) Disconnect() error {
 	if !s.connected {
-		return
+		return errors.New("Database isn't connected")
 	}
 
 	locked := s.mu.TryLock()
@@ -123,20 +123,33 @@ func (s *sybase) disconnect() {
 	s.connected = false
 
 	if s.stdin != nil {
-		s.stdin.Close()
+		err := s.stdin.Close()
+		if err != nil {
+			return err
+		}
 	}
 	if s.stdout != nil {
-		s.stdout.Close()
+		err := s.stdout.Close()
+		if err != nil {
+			return err
+		}
 	}
 	if s.stderr != nil {
-		s.stderr.Close()
+		err := s.stderr.Close()
+		if err != nil {
+			return err
+		}
 	}
 	if s.cmd != nil && s.cmd.Process != nil {
-		s.cmd.Process.Kill()
+		err := s.cmd.Process.Kill()
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, ch := range s.currentQueries {
 		close(ch)
 	}
 	s.currentQueries = make(map[int]chan QueryResponse)
+	return nil
 }

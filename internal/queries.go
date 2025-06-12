@@ -1,4 +1,4 @@
-package gosybase
+package sybase
 
 import (
 	"encoding/json"
@@ -6,8 +6,8 @@ import (
 	"fmt"
 )
 
-func (s *sybase) raw(sql string) (*RawResponse, error) {
-	if !s.isConnected() {
+func (s *Sybase) Raw(sql string) (*RawResponse, error) {
+	if !s.IsConnected() {
 		return nil, errors.New("database isn't connected")
 	}
 

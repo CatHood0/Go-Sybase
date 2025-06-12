@@ -1,4 +1,4 @@
-package gosybase
+package sybase
 
 import (
 	"bufio"
@@ -10,16 +10,16 @@ import (
 	"strings"
 )
 
-func (s *sybase) isConnected() bool {
+func (s *Sybase) IsConnected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.connected
 }
 
-func (s *sybase) handleErrors() {
+func (s *Sybase) handleErrors() {
 	scanner := bufio.NewScanner(s.stderr)
 	for scanner.Scan() {
-		if !s.isConnected() {
+		if !s.IsConnected() {
 			break
 		}
 
@@ -32,14 +32,14 @@ func (s *sybase) handleErrors() {
 		} else {
 			fmt.Printf("Database error: %s\n", errMsg)
 		}
-		s.disconnect()
+		s.Disconnect()
 	}
 }
 
-func (s *sybase) handleResponses() {
+func (s *Sybase) handleResponses() {
 	scanner := bufio.NewScanner(s.stdout)
 	for scanner.Scan() {
-		if !s.isConnected() {
+		if !s.IsConnected() {
 			break
 		}
 
@@ -79,16 +79,15 @@ func getExecutableDir() string {
 func configureBasePath(configPath string) (*string, error) {
 	effectiveBasePath := configPath
 	if effectiveBasePath == "" {
-		// Buscar automáticamente la ruta relativa
 		possiblePaths := []string{
-			"libs/JavaSybaseLink",
-			"../libs/JavaSybaseLink",
-			filepath.Join(getExecutableDir(), "libs", "JavaSybaseLink"),
+			"libs/TDSLink",
+			"../libs/TDSLink",
+			filepath.Join(getExecutableDir(), "libs", "TDSLink"),
 		}
 
 		for _, path := range possiblePaths {
 			if absPath, err := filepath.Abs(path); err == nil {
-				if _, err := os.Stat(filepath.Join(absPath, "dist", "JavaSybaseLink.jar")); err == nil {
+				if _, err := os.Stat(filepath.Join(absPath, "dist", "TDSLink.jar")); err == nil {
 					effectiveBasePath = absPath
 					break
 				}
@@ -96,7 +95,7 @@ func configureBasePath(configPath string) (*string, error) {
 		}
 
 		if effectiveBasePath == "" {
-			return nil, errors.New("no se pudo encontrar el directorio JavaSybaseLink")
+			return nil, errors.New("couldn't be founded TDSLink directory")
 		}
 	}
 	return &effectiveBasePath, nil
@@ -134,4 +133,9 @@ func convertToRawResponse(data []any) (*RawResponse, error) {
 		response.Results = append(response.Results, jsonMap...)
 	}
 	return &response, nil
+}
+
+func checkFileExistence(path string) bool {
+	_, err := os.Stat(path)
+	return os.IsNotExist(err)
 }
