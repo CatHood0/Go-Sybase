@@ -7,8 +7,8 @@ import (
 )
 
 type Database struct {
-	Db        *sybase
-	connected bool
+	db        *sybase
+	Connected bool
 }
 
 func Connect(propertiesPath string, log bool, customTdsLink string) (*Database, error) {
@@ -30,8 +30,8 @@ func Connect(propertiesPath string, log bool, customTdsLink string) (*Database, 
 	}
 
 	return &Database{
-		Db:        sybaseDatabase,
-		connected: true,
+		db:        sybaseDatabase,
+		Connected: true,
 	}, nil
 }
 
@@ -50,16 +50,16 @@ func ConnectWithConfigs(serverConfig Config) (*Database, error) {
 	}
 
 	return &Database{
-		Db: sybaseDatabase,
+		db: sybaseDatabase,
 	}, nil
 }
 
 func (ds *Database) RawQuery(query string) (*RawResponse, error) {
-	if !ds.connected {
+	if !ds.Connected {
 		return nil, errors.New("Database isn't connected")
 	}
 
-	response, err := ds.Db.raw(query)
+	response, err := ds.db.raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -72,7 +72,7 @@ func (ds *Database) RawQuery(query string) (*RawResponse, error) {
 func (ds *Database) QueryFirst(query string) (map[string]any, error) {
 	data := map[string]any{}
 
-	response, err := ds.Db.raw(query)
+	response, err := ds.db.raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -89,10 +89,10 @@ func (ds *Database) QueryFirst(query string) (map[string]any, error) {
 }
 
 func (ds *Database) Query(query string, callback func(map[string]any) error) error {
-	if !ds.connected {
+	if !ds.Connected {
 		return errors.New("Database isn't connected")
 	}
-	response, err := ds.Db.raw(query)
+	response, err := ds.db.raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -110,10 +110,10 @@ func (ds *Database) Query(query string, callback func(map[string]any) error) err
 }
 
 func (ds *Database) Exec(query string) (any, error) {
-	if !ds.connected {
+	if !ds.Connected {
 		return nil, errors.New("Database isn't connected")
 	}
-	value, err := ds.Db.raw(query)
+	value, err := ds.db.raw(query)
 
 	if err != nil {
 		log.Default().Print(err)
@@ -124,6 +124,6 @@ func (ds *Database) Exec(query string) (any, error) {
 }
 
 func (ds *Database) Disconnect() {
-	ds.Db.disconnect()
-	ds.connected = false
+	ds.db.disconnect()
+	ds.Connected = false
 }
