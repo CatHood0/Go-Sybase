@@ -110,7 +110,7 @@ public class StdInputReader {
 
       // Validate required fields
       if (!json.containsKey("msgId") || !json.containsKey("sql")) {
-        System.err.println("JAVAERROR: Missing required fields [msgId or sql]");
+        EncodedLogger.logError("Missing required fields [msgId or sql]");
         return null;
       }
 

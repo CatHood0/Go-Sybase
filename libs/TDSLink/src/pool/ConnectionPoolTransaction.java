@@ -82,7 +82,8 @@ public class ConnectionPoolTransaction {
       DriverManager.registerDriver((Driver) sybDriver);
     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
         | NoSuchMethodException | SecurityException e) {
-      logException("Failed to register Sybase driver", e);
+      EncodedLogger.logError("Failed to register Sybase driver");
+      EncodedLogger.logException(e);
     }
   }
 
@@ -113,14 +114,6 @@ public class ConnectionPoolTransaction {
    */
   private static Connection createNewConnection(String url, Properties props) throws SQLException {
     return DriverManager.getConnection(url, props);
-  }
-
-  /**
-   * Logs exceptions with consistent formatting.
-   */
-  private static void logException(String context, Exception ex) {
-    System.err.println("JAVAERROR: " + context + " => " + ex.toString());
-    System.err.println("JAVALOG: " + context + " => " + ex.getMessage());
   }
 
   /**
@@ -202,7 +195,8 @@ public class ConnectionPoolTransaction {
           conn.close();
         }
       } catch (SQLException ex) {
-        logException("Failed to close available connection", ex);
+        EncodedLogger.logError("Failed to close available connection");
+        EncodedLogger.logException(ex);
       }
     }
     availableConnections.clear();

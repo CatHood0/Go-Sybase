@@ -25,7 +25,6 @@ public class Main implements SQLRequestListener {
   private static final int REQUIRED_ARGS = 13;
   private final SybaseDatabase db;
   private final StdInputReader input;
-  private final Boolean log;
 
   /**
    * Application entry point.
@@ -46,12 +45,14 @@ public class Main implements SQLRequestListener {
    */
   private static Properties buildProperties(String[] args) {
     final Properties props = new Properties();
+    EncodedLogger.log = true;
     if (args.length == 1) {
       final String tdslinkPath = args[0];
       final File configFile = new File(tdslinkPath);
       if (configFile.exists()) {
         try {
           props.load(new FileReader(configFile));
+          EncodedLogger.log = false;
           return props;
         } catch (Exception e) {
           EncodedLogger.logError("Error reading tdslink.properties");
@@ -86,6 +87,7 @@ public class Main implements SQLRequestListener {
     props.setProperty("keepaliveTime", args[10]);
     props.setProperty("maxLifetime", args[11]);
     props.setProperty("transactionConnections", args[12]);
+    EncodedLogger.log = false;
     return props;
   }
 
@@ -96,7 +98,7 @@ public class Main implements SQLRequestListener {
     try {
       new Main(properties);
     } catch (NumberFormatException e) {
-      System.err.println("JAVAERROR: Invalid numeric argument: " + e.getMessage());
+      EncodedLogger.logError("Invalid numeric argument: " + e.getMessage());
       System.exit(1);
     }
   }
@@ -118,12 +120,11 @@ public class Main implements SQLRequestListener {
     final String username = properties.getProperty("username");
     final String password = properties.getProperty("password");
     final Boolean log = Boolean.valueOf(properties.getProperty("log"));
-    this.log = log;
-    EncodedLogger.log = log;
+    EncodedLogger.log = log == null ? false : log;
 
     validateDatabaseCredentials(username, password);
 
-    this.db = initializeDatabase(host, port, dbname, username, password, log,
+    this.db = initializeDatabase(host, port, dbname, username, password,
         minConnections, maxConnections, connectionTimeout, idleTimeout,
         keepaliveTime, maxLifetime, transactionConnections);
 
@@ -139,9 +140,7 @@ public class Main implements SQLRequestListener {
    */
   private void validateDatabaseCredentials(String username, String password) {
     if (username == null || username.isEmpty() || password == null) {
-      if (this.log) {
-        System.err.println("JAVAERROR: Invalid database credentials");
-      }
+      EncodedLogger.logError("Invalid database credentials");
       System.exit(1);
     }
   }
@@ -150,7 +149,7 @@ public class Main implements SQLRequestListener {
    * Initializes the database connection pool.
    */
   private SybaseDatabase initializeDatabase(String host, int port, String dbname, String username,
-      String password, boolean log, int minConnections,
+      String password, int minConnections,
       int maxConnections, int connectionTimeout, int idleTimeout,
       int keepaliveTime, int maxLifetime, int transactionConnections) {
     SybaseDatabase database = new SybaseDatabase(
