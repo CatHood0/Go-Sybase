@@ -15,6 +15,7 @@ import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import pool.ConnectionPool;
 import requests.SQLRequest;
+import utils.EncodedLogger;
 
 /**
  * A Callable implementation that executes SQL queries against a Sybase database
@@ -32,7 +33,6 @@ import requests.SQLRequest;
  */
 public class ExecSQLCallable implements Callable<String> {
 
-  private final Boolean shouldLog;
   private final ConnectionPool connectionPool;
   private final SQLRequest sqlRequest;
 
@@ -43,10 +43,9 @@ public class ExecSQLCallable implements Callable<String> {
    * @param sqlRequest     The SQL request containing the query and metadata
    * @param shouldLog      Whether to enable logging of execution details
    */
-  public ExecSQLCallable(ConnectionPool connectionPool, SQLRequest sqlRequest, Boolean shouldLog) {
+  public ExecSQLCallable(ConnectionPool connectionPool, SQLRequest sqlRequest) {
     this.connectionPool = connectionPool;
     this.sqlRequest = sqlRequest;
-    this.shouldLog = shouldLog;
   }
 
   /**
@@ -58,7 +57,7 @@ public class ExecSQLCallable implements Callable<String> {
   @Override
   public String call() throws Exception {
     String jsonResult = executeSqlQuery();
-    log("Query execution completed. Result size: " + jsonResult.length());
+    EncodedLogger.log("Query execution completed. Result size: " + jsonResult.length());
     return jsonResult;
   }
 
@@ -81,10 +80,9 @@ public class ExecSQLCallable implements Callable<String> {
     try {
       connection = connectionPool.getConnection();
       statement = connection.createStatement();
-      log("Obtained connection from pool");
-
+      EncodedLogger.log("Obtained connection from pool");
       boolean hasResults = statement.execute(sqlRequest.sql);
-      log("Query executed. Has results: " + hasResults);
+      EncodedLogger.log("Query executed. Has results: " + hasResults);
 
       while (hasResults || (statement.getUpdateCount() != -1)) {
         if (!hasResults) {
@@ -146,20 +144,22 @@ public class ExecSQLCallable implements Callable<String> {
         resultSet.close();
         hasResults = statement.getMoreResults();
       }
-      log("Closing database resources");
+      EncodedLogger.log("Closing connection with id=" + sqlRequest.id());
       statement.close();
       connection.close();
     } catch (Exception ex) {
       response.put("error", ex.getMessage());
-      logError("Error executing query", ex);
+      EncodedLogger.logError("Error executing query");
+      EncodedLogger.logException(ex);
 
       try {
         if (connection != null) {
-          log("Closing connection due to error");
+          EncodedLogger.logError("Closing connection due to error");
           connection.close();
         }
       } catch (Exception closingEx) {
-        logError("Error closing connection", closingEx);
+        EncodedLogger.logError("Error closing connection with id=" + sqlRequest.id());
+        EncodedLogger.logException(closingEx);
       }
     } finally {
       closeResource(resultSet, "result set");
@@ -183,44 +183,8 @@ public class ExecSQLCallable implements Callable<String> {
     try {
       resource.close();
     } catch (Exception ex) {
-      logError("Error closing " + resourceName, ex);
+      EncodedLogger.logError("Error closing " + resourceName);
+      EncodedLogger.logException(ex);
     }
-  }
-
-  /**
-   * Thread-safe printing to standard output.
-   * 
-   * @param message The message to print
-   */
-  public void synchronizedPrintln(String message) {
-    synchronized (System.out) {
-      System.out.println(message);
-    }
-  }
-
-  /**
-   * Logs a message if logging is enabled.
-   * 
-   * @param message The message to log
-   */
-  private void log(String message) {
-    if (this.shouldLog) {
-      String logMessage = message.startsWith("JAVAERROR: ") ? message : "JAVALOG: " + message;
-      // Truncate very long messages
-      if (logMessage.length() > 1000) {
-        logMessage = logMessage.substring(0, 1000) + " ... (truncated)";
-      }
-      synchronizedPrintln(logMessage);
-    }
-  }
-
-  /**
-   * Logs an error message if logging is enabled.
-   * 
-   * @param context   Contextual information about the error
-   * @param exception The exception that occurred
-   */
-  private void logError(String context, Exception exception) {
-    log("JAVAERROR: " + context + " => " + exception.toString());
   }
 }

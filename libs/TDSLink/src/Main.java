@@ -7,6 +7,7 @@ import database_manager.SybaseDatabase;
 import input_reader.StdInputReader;
 import requests.SQLRequest;
 import requests.SQLRequestListener;
+import utils.EncodedLogger;
 
 /**
  * Main entry point for the SQL Bridge application that:
@@ -53,21 +54,21 @@ public class Main implements SQLRequestListener {
           props.load(new FileReader(configFile));
           return props;
         } catch (Exception e) {
-          System.err.println("JAVAERROR: Error reading tdslink.properties => " + e.getMessage());
+          EncodedLogger.logError("Error reading tdslink.properties");
+          EncodedLogger.logException(e);
           System.exit(1);
         }
       } else {
-        System.err.println("JAVAERROR: Invalid tdslink.properties path passed => \"" + tdslinkPath + "\"");
+        EncodedLogger.logError("Invalid tdslink.properties path => \"" + tdslinkPath + "\"");
         System.exit(1);
       }
     }
 
     if (args.length != REQUIRED_ARGS) {
-      System.err.println(
-          "JAVAERROR: required args => <host>, <port>, <dbname>, <username>, <password>, <log>, " +
-              "<minConnections>, <maxConnections>, <connectionTimeout>, <idleTimeout>, " +
-              "<keepaliveTime>, <maxLifetime>, <transactionConnections>\n" +
-              "Or provide a tdslink.properties file in the root directory with these properties.");
+      EncodedLogger.logError("JAVAERROR: required args => <host>, <port>, <dbname>, <username>, <password>, <log>, " +
+          "<minConnections>, <maxConnections>, <connectionTimeout>, <idleTimeout>, " +
+          "<keepaliveTime>, <maxLifetime>, <transactionConnections>\n" +
+          "Or provide a tdslink.properties file in the root directory with these properties.");
       System.exit(1);
     }
 
@@ -118,6 +119,7 @@ public class Main implements SQLRequestListener {
     final String password = properties.getProperty("password");
     final Boolean log = Boolean.valueOf(properties.getProperty("log"));
     this.log = log;
+    EncodedLogger.log = log;
 
     validateDatabaseCredentials(username, password);
 
@@ -152,14 +154,12 @@ public class Main implements SQLRequestListener {
       int maxConnections, int connectionTimeout, int idleTimeout,
       int keepaliveTime, int maxLifetime, int transactionConnections) {
     SybaseDatabase database = new SybaseDatabase(
-        host, port, dbname, username, password, log,
+        host, port, dbname, username, password,
         minConnections, maxConnections, connectionTimeout,
         idleTimeout, keepaliveTime, maxLifetime, transactionConnections);
 
     if (!database.connect()) {
-      if (this.log) {
-        System.err.println("JAVAERROR: Failed to connect to database");
-      }
+      EncodedLogger.logError("Database isn't connected");
       System.exit(1);
     }
     return database;
@@ -169,7 +169,7 @@ public class Main implements SQLRequestListener {
    * Initializes the input reader and registers this class as listener.
    */
   private StdInputReader initializeInputReader(boolean logEnabled) {
-    StdInputReader reader = new StdInputReader(logEnabled);
+    StdInputReader reader = new StdInputReader();
     reader.addListener(this);
     return reader;
   }
@@ -178,10 +178,8 @@ public class Main implements SQLRequestListener {
    * Logs successful database connection.
    */
   private void logConnectionSuccess(String host, int port, String dbname) {
-    if (this.log) {
-      System.out.println("JAVALOG: Connected to " + host + ":" + port + "/" + dbname);
-      System.out.println("JAVALOG: Ready to process SQL requests");
-    }
+    EncodedLogger.log("Connected to " + host + ":" + port + "/" + dbname);
+    EncodedLogger.log("Ready to process SQL requests");
   }
 
   /**
@@ -199,13 +197,11 @@ public class Main implements SQLRequestListener {
   @Override
   public void sqlRequest(SQLRequest request) {
     if (request == null || request.sql == null || request.sql.trim().isEmpty()) {
-      System.err.println("JAVAERROR: Received invalid SQL request (It will be ignored)");
+      EncodedLogger.logError("Received invalid SQL request (It will be ignored)");
       return;
     }
 
-    if (this.log) {
-      System.out.println("JAVALOG: Processing request msgId = " + request.msgId);
-    }
+    EncodedLogger.log("Processing request msgId = " + request.msgId);
 
     db.execSQL(request);
   }

@@ -12,6 +12,8 @@ import java.util.Properties;
 
 import com.sybase.jdbc4.jdbc.SybDataSource;
 
+import utils.EncodedLogger;
+
 /**
  * A connection pool implementation specifically designed for managing database
  * connections
@@ -181,7 +183,7 @@ public class ConnectionPoolTransaction {
           this.availableConnections.add(
               createNewConnection(this.databaseUrl, this.connectionProperties));
         } catch (SQLException ex) {
-          logException("Failed to replenish connection pool", ex);
+          EncodedLogger.logException(ex);
         }
       }
     }
@@ -212,7 +214,7 @@ public class ConnectionPoolTransaction {
           conn.close();
         }
       } catch (SQLException ex) {
-        logException("Failed to close active connection", ex);
+        EncodedLogger.logException(ex);
       }
     }
     activeTransactionConnections.clear();

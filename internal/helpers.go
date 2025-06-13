@@ -23,10 +23,12 @@ func (s *Sybase) handleErrors() {
 			break
 		}
 
-		errMsg := scanner.Text()
+		// since output or errors comes in bytes format
+		// we prefer converting them into string
+		errMsg := string(scanner.Bytes()[:])
 		// normally, these are response logs from the Tds bridge
 		// we prefer ignoring them just printing as a common log
-		if strings.HasPrefix(errMsg, "JAVAERROR:") {
+		if strings.HasPrefix(errMsg, "JAVAERROR:") || strings.HasPrefix(errMsg, "JAVAEXCEPTION:") {
 			fmt.Printf("%s\n", errMsg)
 			continue
 		} else {
@@ -47,7 +49,7 @@ func (s *Sybase) handleResponses() {
 			// normally, these are response logs from the Tds bridge
 			// we prefer ignoring them just printing as a common log
 			cmdLog := string(scanner.Bytes()[:])
-			if strings.HasPrefix(cmdLog, "JAVALOG:") || strings.HasPrefix(cmdLog, "JAVAERROR:") {
+			if strings.HasPrefix(cmdLog, "JAVALOG:") {
 				fmt.Printf("%s\n", cmdLog)
 				continue
 			}
@@ -109,10 +111,10 @@ func getTdsJarPath(config *Config) (*string, error) {
 	}
 
 	// Construir rutas completas
-	tdsPath := filepath.Join(*basePath, "dist", "TdsLink.jar")
+	tdsPath := filepath.Join(*basePath, "dist", "TDSLink.jar")
 
 	if _, err := os.Stat(tdsPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("TdsLink.jar no encontrado en: %s", tdsPath)
+		return nil, fmt.Errorf("TDSLink.jar no encontrado en: %s", tdsPath)
 	}
 	return &tdsPath, nil
 }

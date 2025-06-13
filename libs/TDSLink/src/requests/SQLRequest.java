@@ -16,6 +16,10 @@ public class SQLRequest {
   public long sentTime; // The time the request was sent
   public long javaStartTime; // The time the request was received
 
+  public String id() {
+    return String.valueOf(transId > -1 ? transId : msgId);
+  }
+
   @Override
   public String toString() {
     return String.format(

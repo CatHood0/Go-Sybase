@@ -15,6 +15,7 @@ import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import pool.ConnectionPoolTransaction;
 import requests.SQLRequest;
+import utils.EncodedLogger;
 
 /**
  * A Callable implementation for executing SQL queries within transactions.
@@ -34,7 +35,6 @@ public class ExecSQLTransactionCallable implements Callable<String> {
 
   private final ConnectionPoolTransaction connectionPool;
   private final SQLRequest sqlRequest;
-  private final Boolean shouldLog;
 
   /**
    * Constructs a new ExecSQLTransactionCallable instance.
@@ -45,11 +45,9 @@ public class ExecSQLTransactionCallable implements Callable<String> {
    * @param shouldLog      Whether to enable execution logging
    */
   public ExecSQLTransactionCallable(ConnectionPoolTransaction connectionPool,
-      SQLRequest sqlRequest,
-      Boolean shouldLog) {
+      SQLRequest sqlRequest) {
     this.connectionPool = connectionPool;
     this.sqlRequest = sqlRequest;
-    this.shouldLog = shouldLog;
   }
 
   /**
@@ -61,7 +59,7 @@ public class ExecSQLTransactionCallable implements Callable<String> {
   @Override
   public String call() throws Exception {
     String result = executeSqlTransaction();
-    log("Transaction executed. Result size: " + result.length());
+    EncodedLogger.log("Transaction executed. Result size: " + result.length());
     return result;
   }
 
@@ -84,17 +82,16 @@ public class ExecSQLTransactionCallable implements Callable<String> {
 
     try {
       connection = this.connectionPool.getConnection(sqlRequest.transId);
-      log("Transaction connection established");
+      EncodedLogger.log("Transaction connection established");
 
       if (connection == null || connection.isClosed()) {
         response.put("error", "Transaction connection is closed");
-        log("Connection is unavailable (null or closed)");
+        EncodedLogger.log("Connection is unavailable (null or closed)");
         return response.toJSONString();
       }
 
       statement = connection.createStatement();
       boolean hasResults = statement.execute(sqlRequest.sql);
-      log("Query executed successfully. Has results: " + hasResults);
 
       while (hasResults || (statement.getUpdateCount() != -1)) {
         if (!hasResults) {
@@ -179,16 +176,19 @@ public class ExecSQLTransactionCallable implements Callable<String> {
       Connection connection,
       Exception exception) {
     response.put("error", exception.getMessage());
-    logError("Transaction error occurred", exception);
 
     try {
       if (connection != null) {
-        log("Initiating transaction rollback");
+        EncodedLogger.log("Initiating transaction rollback");
         connection.rollback();
       }
     } catch (Exception rollbackEx) {
-      logError("Rollback failed", rollbackEx);
+      EncodedLogger.logError("Rollback failed");
+      EncodedLogger.logException(rollbackEx);
     }
+
+    EncodedLogger.logError("Transaction error caused by: ");
+    EncodedLogger.logException(exception);
   }
 
   /**
@@ -207,7 +207,8 @@ public class ExecSQLTransactionCallable implements Callable<String> {
         this.connectionPool.releaseConnection(sqlRequest.transId);
       }
     } catch (Exception ex) {
-      logError("Failed to release connection to pool", ex);
+      EncodedLogger.logError("Failed to release connection to pool");
+      EncodedLogger.logException(ex);
     }
 
     // Close result set
@@ -216,7 +217,8 @@ public class ExecSQLTransactionCallable implements Callable<String> {
         resultSet.close();
       }
     } catch (Exception ex) {
-      logError("Failed to close result set", ex);
+      EncodedLogger.logError("Failed to close result set");
+      EncodedLogger.logException(ex);
     }
 
     // Close statement
@@ -225,44 +227,8 @@ public class ExecSQLTransactionCallable implements Callable<String> {
         statement.close();
       }
     } catch (Exception ex) {
-      logError("Failed to close statement", ex);
+      EncodedLogger.logError("Failed to close statement");
+      EncodedLogger.logException(ex);
     }
-  }
-
-  /**
-   * Thread-safe printing to standard output.
-   * 
-   * @param message The message to print
-   */
-  public void synchronizedPrintln(String message) {
-    synchronized (System.out) {
-      System.out.println(message);
-    }
-  }
-
-  /**
-   * Logs a message if logging is enabled.
-   * 
-   * @param message The message to log
-   */
-  private void log(String message) {
-    if (this.shouldLog) {
-      String logMessage = message.startsWith("JAVAERROR: ") ? message : "JAVALOG: " + message;
-      // Truncate very long messages
-      if (logMessage.length() > 1000) {
-        logMessage = logMessage.substring(0, 1000) + " ... (truncated)";
-      }
-      synchronizedPrintln(logMessage);
-    }
-  }
-
-  /**
-   * Logs an error message if logging is enabled.
-   * 
-   * @param context   Contextual information about the error
-   * @param exception The exception that occurred
-   */
-  private void logError(String context, Exception exception) {
-    log("JAVAERROR: " + context + " => " + exception.toString());
   }
 }

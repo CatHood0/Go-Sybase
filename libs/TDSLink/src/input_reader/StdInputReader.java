@@ -9,6 +9,7 @@ import net.minidev.json.JSONObject;
 import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 import requests.*;
+import utils.EncodedLogger;
 
 /**
  * Reads and processes SQL requests from standard input in JSON format,
@@ -31,7 +32,6 @@ import requests.*;
 public class StdInputReader {
   private final List<SQLRequestListener> listeners = new ArrayList<>();
   private final BufferedReader inputBuffer = new BufferedReader(new InputStreamReader(System.in));
-  private final boolean logEnabled;
   private final JSONParser jsonParser = new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
 
   /**
@@ -39,11 +39,8 @@ public class StdInputReader {
    * 
    * @param logEnabled Whether to enable debug logging
    */
-  public StdInputReader(boolean logEnabled) {
-    this.logEnabled = logEnabled;
-    if (this.logEnabled) {
-      System.out.println("JAVALOG: StdInputReader initialized with logging enabled");
-    }
+  public StdInputReader() {
+    EncodedLogger.log("StdInputReader initialized with logging enabled");
   }
 
   /**
@@ -63,11 +60,9 @@ public class StdInputReader {
         processInputLine(inputLine);
       }
     } catch (IOException ex) {
-      System.err.println("JAVAERROR: Fatal IO error in read loop: " + ex.toString());
+      EncodedLogger.logException(ex);
     } finally {
-      if (logEnabled) {
-        System.out.println("JAVALOG: Input reader loop terminated");
-      }
+      EncodedLogger.log("Input reader loop terminated");
     }
   }
 
@@ -77,9 +72,7 @@ public class StdInputReader {
   private void processInputLine(String inputLine) {
     // Normalize the input by removing unwanted whitespace
     String normalizedInput = normalizeInput(inputLine);
-    if (logEnabled) {
-      System.out.println("JAVALOG: Processing raw input: " + normalizedInput);
-    }
+    EncodedLogger.log("Processing raw input: " + normalizedInput);
 
     try {
       SQLRequest request = parseRequest(normalizedInput);
@@ -87,7 +80,7 @@ public class StdInputReader {
         notifyListeners(request);
       }
     } catch (Exception ex) {
-      System.err.println("JAVAERROR: Failed to process input: " + ex.toString());
+      EncodedLogger.logException(ex);
     }
   }
 
@@ -131,10 +124,10 @@ public class StdInputReader {
       request.timeoutUnit = getStringValue(json, "timeunit", "minutes");
       return request;
     } catch (ParseException ex) {
-      System.err.println("JAVAERROR: Invalid JSON format: " + ex.toString());
+      EncodedLogger.logException(ex);
       return null;
     } catch (Exception ex) {
-      System.err.println("JAVAERROR: Unexpected error parsing request: " + ex.toString());
+      EncodedLogger.logException(ex);
       return null;
     }
   }
@@ -146,7 +139,7 @@ public class StdInputReader {
     try {
       return json.get(key) != null ? ((Number) json.get(key)).intValue() : defaultValue;
     } catch (Exception ex) {
-      System.err.println("JAVAERROR: Invalid value for " + key + ", using default");
+      EncodedLogger.logError("Invalid value for " + key + ", using default");
       return defaultValue;
     }
   }
@@ -158,7 +151,7 @@ public class StdInputReader {
     try {
       return json.get(key) != null ? (Boolean) json.get(key) : defaultValue;
     } catch (Exception ex) {
-      System.err.println("JAVAERROR: Invalid value for " + key + ", using default");
+      EncodedLogger.logError("Invalid value for " + key + ", using default");
       return defaultValue;
     }
   }
@@ -170,7 +163,7 @@ public class StdInputReader {
     try {
       return json.get(key) != null ? json.get(key).toString() : defaultValue;
     } catch (Exception ex) {
-      System.err.println("JAVAERROR: Invalid value for " + key + ", using default");
+      EncodedLogger.logError("Invalid value for " + key + ", using default");
       return defaultValue;
     }
   }
@@ -180,7 +173,7 @@ public class StdInputReader {
    */
   private void notifyListeners(SQLRequest request) {
     if (listeners.isEmpty()) {
-      System.err.println("JAVAERROR: No listeners registered to handle request");
+      EncodedLogger.logError("No listeners registered to handle request");
       return;
     }
 
@@ -188,7 +181,7 @@ public class StdInputReader {
       try {
         listener.sqlRequest(request);
       } catch (Exception ex) {
-        System.err.println("JAVAERROR: Listener failed to process request: " + ex.toString());
+        EncodedLogger.logException(ex);
       }
     }
   }

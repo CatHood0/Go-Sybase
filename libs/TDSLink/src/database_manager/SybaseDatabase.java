@@ -14,6 +14,7 @@ import executors.ExecSQLTransactionCallable;
 import pool.ConnectionPool;
 import pool.ConnectionPoolTransaction;
 import requests.SQLRequest;
+import utils.EncodedLogger;
 
 /**
  * Main database access class for Sybase databases, providing connection
@@ -41,7 +42,6 @@ public class SybaseDatabase {
   private final String dbName;
   private final String username;
   private final String password;
-  private final boolean logEnabled;
 
   // Connection pool configurations
   private final int minConnections;
@@ -76,7 +76,7 @@ public class SybaseDatabase {
    * @param maxLifetime            Maximum connection lifetime in milliseconds
    * @param transactionConnections Number of dedicated transaction connections
    */
-  public SybaseDatabase(String host, int port, String dbName, String username, String password, boolean logEnabled,
+  public SybaseDatabase(String host, int port, String dbName, String username, String password,
       int minConnections, int maxConnections, int connectionTimeout, int idleTimeout,
       int keepaliveTime, int maxLifetime, int transactionConnections) {
     this.host = host;
@@ -84,7 +84,6 @@ public class SybaseDatabase {
     this.dbName = dbName;
     this.username = username;
     this.password = password;
-    this.logEnabled = logEnabled;
     this.minConnections = minConnections;
     this.maxConnections = maxConnections;
     this.connectionTimeout = connectionTimeout;
@@ -119,7 +118,8 @@ public class SybaseDatabase {
       return true;
 
     } catch (Exception ex) {
-      logException("Failed to connect to database", ex);
+      EncodedLogger.logError("Failed to connect to database");
+      EncodedLogger.logException(ex);
       return false;
     }
   }
@@ -138,7 +138,8 @@ public class SybaseDatabase {
         }
         executor.shutdown();
       } catch (Exception ex) {
-        logException("Error during shutdown", ex);
+        EncodedLogger.logError("Error during shutdown");
+        EncodedLogger.logException(ex);
       }
     }));
   }
@@ -154,9 +155,7 @@ public class SybaseDatabase {
       throw new IllegalStateException("Database connection not established. Call connect() first.");
     }
 
-    if (logEnabled) {
-      System.out.println("JAVALOG: Executing request at " + LocalDate.now() + ". " + request);
-    }
+    EncodedLogger.log("Executing request at " + LocalDate.now() + ". " + request);
 
     Future<String> future = executor.submit(createCallable(request));
     awaitResult(future, request);
@@ -166,8 +165,8 @@ public class SybaseDatabase {
    * Creates the appropriate callable based on request type.
    */
   private Callable<String> createCallable(SQLRequest request) {
-    return request.transId != -1 ? new ExecSQLTransactionCallable(transactionPool, request, logEnabled)
-        : new ExecSQLCallable(pool, request, logEnabled);
+    return request.transId != -1 ? new ExecSQLTransactionCallable(transactionPool, request)
+        : new ExecSQLCallable(pool, request);
   }
 
   /**
@@ -175,14 +174,17 @@ public class SybaseDatabase {
    */
   private void awaitResult(Future<String> future, SQLRequest request) {
     try {
-      System.out.println(future.get(request.timeout, parseTimeUnit(request.timeoutUnit)));
+      EncodedLogger.log(future.get(request.timeout, parseTimeUnit(request.timeoutUnit)));
     } catch (TimeoutException e) {
-      logException("Query timed out", e);
+      EncodedLogger.logError("Query timed out");
+      EncodedLogger.logException(e);
     } catch (InterruptedException e) {
-      logException("Query execution interrupted", e);
+      EncodedLogger.logError("Query execution interrupted");
+      EncodedLogger.logException(e);
       Thread.currentThread().interrupt();
     } catch (ExecutionException e) {
-      logException("Query execution failed", e);
+      EncodedLogger.logError("Query execution failed");
+      EncodedLogger.logException(e);
     }
   }
 
@@ -193,17 +195,26 @@ public class SybaseDatabase {
     switch (timeUnitStr.toLowerCase()) {
       case "seconds":
         return TimeUnit.SECONDS;
+      case "minute":
       case "minutes":
         return TimeUnit.MINUTES;
+      case "hour":
       case "hours":
         return TimeUnit.HOURS;
+      case "day":
       case "days":
         return TimeUnit.DAYS;
       case "nanoseconds":
         return TimeUnit.NANOSECONDS;
       case "microseconds":
         return TimeUnit.MICROSECONDS;
+      case "milliseconds":
+        return TimeUnit.MILLISECONDS;
       default:
+        EncodedLogger
+            .log("Timeunit of type: " +
+                timeUnitStr + " is not supported. Using default " +
+                "value TimeUnit.MILLISECONDS");
         return TimeUnit.MILLISECONDS;
     }
   }
@@ -214,28 +225,17 @@ public class SybaseDatabase {
   public void disconnect() {
     try {
       if (pool != null) {
+        EncodedLogger.logError("Shutdown pool connection");
         pool.shutdown();
       }
       if (transactionPool != null) {
+        EncodedLogger.logError("Shutdown transaction connection");
         transactionPool.shutdown();
       }
       executor.shutdown();
     } catch (Exception ex) {
-      logException("Error during disconnection", ex);
-    }
-  }
-
-  /**
-   * Logs an exception if logging is enabled.
-   *
-   * @param context Context description of the error
-   * @param ex      The exception to log
-   */
-  private void logException(String context, Exception ex) {
-    if (logEnabled) {
-      System.err.println("JAVAERROR: (1) " + context + " => " + ex.toString());
-      System.err.println("JAVAERROR: (2) " + context + " => " + ex.getMessage());
-      ex.printStackTrace();
+      EncodedLogger.logError("Error during disconnection");
+      EncodedLogger.logException(ex);
     }
   }
 }

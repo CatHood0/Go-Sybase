@@ -1,6 +1,10 @@
 package pool;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+
+import utils.EncodedLogger;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -120,7 +124,7 @@ public class ConnectionPool {
     try {
       this.dataSource.close();
     } catch (Exception e) {
-      System.err.println("JAVAERROR: Failed to shutdown connection pool" + e.toString());
+      EncodedLogger.logError("Failed to shutdown connection pool" + e.toString());
     }
   }
 
