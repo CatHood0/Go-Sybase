@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+const (
+	javaLogPrefix          = "JAVALOG:"
+	javaLogErrorPrefix     = "JAVAEXCEPTION:"
+	javaLogExceptionPrefix = "JAVAERROR:"
+)
+
 func (s *Sybase) IsConnected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -25,14 +31,15 @@ func (s *Sybase) handleErrors() {
 
 		// since output or errors comes in bytes format
 		// we prefer converting them into string
-		errMsg := string(scanner.Bytes()[:])
-		// normally, these are response logs from the Tds bridge
-		// we prefer ignoring them just printing as a common log
-		if strings.HasPrefix(errMsg, "JAVAERROR:") || strings.HasPrefix(errMsg, "JAVAEXCEPTION:") {
+		errMsg := string(scanner.Bytes())
+		switch {
+		case strings.HasPrefix(errMsg, javaLogErrorPrefix):
+		case strings.HasPrefix(errMsg, javaLogExceptionPrefix):
 			fmt.Printf("%s\n", errMsg)
 			continue
-		} else {
+		default:
 			fmt.Printf("Database error: %s\n", errMsg)
+			break
 		}
 		s.Disconnect()
 	}
@@ -48,8 +55,8 @@ func (s *Sybase) handleResponses() {
 		if s.logs {
 			// normally, these are response logs from the Tds bridge
 			// we prefer ignoring them just printing as a common log
-			cmdLog := string(scanner.Bytes()[:])
-			if strings.HasPrefix(cmdLog, "JAVALOG:") {
+			cmdLog := string(scanner.Bytes())
+			if strings.HasPrefix(cmdLog, javaLogPrefix) {
 				fmt.Printf("%s\n", cmdLog)
 				continue
 			}
@@ -58,7 +65,7 @@ func (s *Sybase) handleResponses() {
 		var resp QueryResponse
 
 		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
-			fmt.Printf("Error parsing response: %v\n", err)
+			fmt.Printf("error parsing response: %v\n", err)
 			continue
 		}
 
