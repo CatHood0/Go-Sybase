@@ -132,6 +132,10 @@ public class ExecSQLCallable implements Callable<String> {
 
             int dataType = metaData.getColumnType(columnIndex);
             switch (dataType) {
+              // since some old sybase database models 
+              // does not support using rs.getTimestamp(...).toInstant()
+              // we prefer just converting it manually, to avoid
+              // unexpected exception for no implementations
               case DateConstants.TYPE_TIMESTAMP:
               case DateConstants.TYPE_DATE:
                 final String date = DateConstants.DATE_FORMAT
@@ -139,12 +143,6 @@ public class ExecSQLCallable implements Callable<String> {
                 rowData.put(columnName, date); // ISO "yyyy-MM-dd" format
                 break;
               case DateConstants.TYPE_TIME:
-                /**
-                 * 
-                 * String timeFromRS = rs.getTime(c).toString();
-                 * String my8601formattedTime = "1970-01-01T" + timeFromRS + ".000Z";
-                 * row.put(columns[c], my8601formattedTime);
-                 */
                 LocalTime time = resultSet.getObject(columnIndex, LocalTime.class);
                 rowData.put(columnName, time.format(DateTimeFormatter.ISO_TIME));
                 break;
