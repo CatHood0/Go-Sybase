@@ -2,15 +2,17 @@ package database_manager;
 
 import java.time.LocalDate;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
+import java.util.logging.Handler;
 
 import executors.ExecSQLCallable;
 import executors.ExecSQLTransactionCallable;
+
+import java.sql.SQLException;
 import pool.ConnectionPool;
 import pool.ConnectionPoolTransaction;
 import requests.SQLRequest;
@@ -67,7 +69,6 @@ public class SybaseDatabase {
    * @param dbName                 Database name
    * @param username               Database username
    * @param password               Database password
-   * @param logEnabled             Whether to enable logging
    * @param minConnections         Minimum number of connections in the pool
    * @param maxConnections         Maximum number of connections in the pool
    * @param connectionTimeout      Connection timeout in milliseconds
@@ -100,6 +101,13 @@ public class SybaseDatabase {
    * @return true if connection was successful, false otherwise
    */
   public boolean connect() {
+    // settings this config to the loggers, avoid printing unnecessary logs
+    // from libraries that are not actually errors or exceptions
+    Logger rootLogger = LogManager.getLogManager().getLogger("");
+    rootLogger.setLevel(Level.SEVERE);
+    for (Handler h : rootLogger.getHandlers()) {
+      h.setLevel(Level.SEVERE);
+    }
     try {
       // Initialize regular connection pool
       this.pool = ConnectionPool.create(
@@ -117,7 +125,7 @@ public class SybaseDatabase {
       registerShutdownHook();
       return true;
 
-    } catch (Exception ex) {
+    } catch (ClassNotFoundException | SQLException ex) {
       EncodedLogger.logError("Failed to connect to database");
       EncodedLogger.logException(ex);
       return false;
@@ -152,13 +160,13 @@ public class SybaseDatabase {
    */
   public void execSQL(SQLRequest request) {
     if (pool == null || transactionPool == null) {
-      throw new IllegalStateException("Database connection not established. Call connect() first.");
+      EncodedLogger.logException(new IllegalStateException("Database connection not established. Call connect() first."));
+      return;
     }
 
     EncodedLogger.log("Executing request at " + LocalDate.now() + ". " + request);
 
-    Future<String> future = executor.submit(createCallable(request));
-    awaitResult(future, request);
+    executor.submit(createCallable(request));
   }
 
   /**
@@ -167,75 +175,5 @@ public class SybaseDatabase {
   private Callable<String> createCallable(SQLRequest request) {
     return request.transId != -1 ? new ExecSQLTransactionCallable(transactionPool, request)
         : new ExecSQLCallable(pool, request);
-  }
-
-  /**
-   * Waits for the query result with the specified timeout.
-   */
-  private void awaitResult(Future<String> future, SQLRequest request) {
-    try {
-      EncodedLogger.log(future.get(request.timeout, parseTimeUnit(request.timeoutUnit)));
-    } catch (TimeoutException e) {
-      EncodedLogger.logError("Query timed out");
-      EncodedLogger.logException(e);
-    } catch (InterruptedException e) {
-      EncodedLogger.logError("Query execution interrupted");
-      EncodedLogger.logException(e);
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      EncodedLogger.logError("Query execution failed");
-      EncodedLogger.logException(e);
-    }
-  }
-
-  /**
-   * Parses time unit string into TimeUnit enum.
-   */
-  private TimeUnit parseTimeUnit(String timeUnitStr) {
-    switch (timeUnitStr.toLowerCase()) {
-      case "seconds":
-        return TimeUnit.SECONDS;
-      case "minute":
-      case "minutes":
-        return TimeUnit.MINUTES;
-      case "hour":
-      case "hours":
-        return TimeUnit.HOURS;
-      case "day":
-      case "days":
-        return TimeUnit.DAYS;
-      case "nanoseconds":
-        return TimeUnit.NANOSECONDS;
-      case "microseconds":
-        return TimeUnit.MICROSECONDS;
-      case "milliseconds":
-        return TimeUnit.MILLISECONDS;
-      default:
-        EncodedLogger
-            .log("Timeunit of type: " +
-                timeUnitStr + " is not supported. Using default " +
-                "value TimeUnit.MILLISECONDS");
-        return TimeUnit.MILLISECONDS;
-    }
-  }
-
-  /**
-   * Closes all database connections and releases resources.
-   */
-  public void disconnect() {
-    try {
-      if (pool != null) {
-        EncodedLogger.logError("Shutdown pool connection");
-        pool.shutdown();
-      }
-      if (transactionPool != null) {
-        EncodedLogger.logError("Shutdown transaction connection");
-        transactionPool.shutdown();
-      }
-      executor.shutdown();
-    } catch (Exception ex) {
-      EncodedLogger.logError("Error during disconnection");
-      EncodedLogger.logException(ex);
-    }
   }
 }

@@ -1,16 +1,16 @@
 package executors;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Callable;
 
 import constants.DateConstants;
+import java.sql.SQLException;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import pool.ConnectionPool;
@@ -57,7 +57,15 @@ public class ExecSQLCallable implements Callable<String> {
   @Override
   public String call() throws Exception {
     String jsonResult = executeSqlQuery();
-    EncodedLogger.log("Query execution completed. Result size: " + jsonResult.length());
+    EncodedLogger.log("Query executed successfully. Result size: " + jsonResult.length());
+    // the unique way to send the response back to the client
+    // is printing it to the console here
+    //
+    // if we use Future clase with get() method,
+    // the response wont be sent back to the client
+    // or sometimes will convert the current thread in
+    // a zombie one
+    System.out.println(jsonResult);
     return jsonResult;
   }
 
@@ -125,14 +133,18 @@ public class ExecSQLCallable implements Callable<String> {
             int dataType = metaData.getColumnType(columnIndex);
             switch (dataType) {
               case DateConstants.TYPE_TIMESTAMP:
-                Instant timestamp = resultSet.getTimestamp(columnIndex).toInstant();
-                rowData.put(columnName, DateConstants.ISO_FORMATTER.format(timestamp));
-                break;
               case DateConstants.TYPE_DATE:
-                LocalDate date = resultSet.getObject(columnIndex, LocalDate.class);
-                rowData.put(columnName, date.toString()); // ISO "yyyy-MM-dd" format
+                final String date = DateConstants.DATE_FORMAT
+                    .format(new Date(resultSet.getTimestamp(columnIndex).getTime()));
+                rowData.put(columnName, date); // ISO "yyyy-MM-dd" format
                 break;
               case DateConstants.TYPE_TIME:
+                /**
+                 * 
+                 * String timeFromRS = rs.getTime(c).toString();
+                 * String my8601formattedTime = "1970-01-01T" + timeFromRS + ".000Z";
+                 * row.put(columns[c], my8601formattedTime);
+                 */
                 LocalTime time = resultSet.getObject(columnIndex, LocalTime.class);
                 rowData.put(columnName, time.format(DateTimeFormatter.ISO_TIME));
                 break;
@@ -147,7 +159,7 @@ public class ExecSQLCallable implements Callable<String> {
       EncodedLogger.log("Closing connection with id=" + sqlRequest.id());
       statement.close();
       connection.close();
-    } catch (Exception ex) {
+    } catch (SQLException ex) {
       response.put("error", ex.getMessage());
       EncodedLogger.logError("Error executing query");
       EncodedLogger.logException(ex);
@@ -157,7 +169,7 @@ public class ExecSQLCallable implements Callable<String> {
           EncodedLogger.logError("Closing connection due to error");
           connection.close();
         }
-      } catch (Exception closingEx) {
+      } catch (SQLException closingEx) {
         EncodedLogger.logError("Error closing connection with id=" + sqlRequest.id());
         EncodedLogger.logException(closingEx);
       }
@@ -168,7 +180,8 @@ public class ExecSQLCallable implements Callable<String> {
 
     response.put("javaStartTime", sqlRequest.javaStartTime);
     response.put("javaEndTime", System.currentTimeMillis());
-    return response.toJSONString();
+    final String jsonResponse = response.toJSONString();
+    return jsonResponse;
   }
 
   /**

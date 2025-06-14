@@ -1,10 +1,12 @@
+import constants.DateConstants;
 import java.io.File;
 import java.io.FileReader;
 import java.util.Properties;
 
-import constants.DateConstants;
 import database_manager.SybaseDatabase;
 import input_reader.StdInputReader;
+import java.io.IOException;
+
 import requests.SQLRequest;
 import requests.SQLRequestListener;
 import utils.EncodedLogger;
@@ -45,16 +47,14 @@ public class Main implements SQLRequestListener {
    */
   private static Properties buildProperties(String[] args) {
     final Properties props = new Properties();
-    EncodedLogger.log = true;
     if (args.length == 1) {
       final String tdslinkPath = args[0];
       final File configFile = new File(tdslinkPath);
       if (configFile.exists()) {
         try {
           props.load(new FileReader(configFile));
-          EncodedLogger.log = false;
           return props;
-        } catch (Exception e) {
+        } catch (IOException e) {
           EncodedLogger.logError("Error reading tdslink.properties");
           EncodedLogger.logException(e);
           System.exit(1);
@@ -99,12 +99,16 @@ public class Main implements SQLRequestListener {
       new Main(properties);
     } catch (NumberFormatException e) {
       EncodedLogger.logError("Invalid numeric argument: " + e.getMessage());
+      EncodedLogger.logException(e);
       System.exit(1);
     }
   }
 
   /**
    * Constructs and initializes the SQL Bridge application.
+   * 
+   * @param properties
+   * 
    */
   public Main(Properties properties) {
     final int port = Integer.parseInt(properties.getProperty("port"));
@@ -120,7 +124,7 @@ public class Main implements SQLRequestListener {
     final String username = properties.getProperty("username");
     final String password = properties.getProperty("password");
     final Boolean log = Boolean.valueOf(properties.getProperty("log"));
-    EncodedLogger.log = log == null ? false : log;
+    EncodedLogger.log = log;
 
     validateDatabaseCredentials(username, password);
 
@@ -128,10 +132,9 @@ public class Main implements SQLRequestListener {
         minConnections, maxConnections, connectionTimeout, idleTimeout,
         keepaliveTime, maxLifetime, transactionConnections);
 
-    this.input = initializeInputReader(log);
+    this.input = initializeInputReader();
     DateConstants.init();
 
-    logConnectionSuccess(host, port, dbname);
     startInputProcessing();
   }
 
@@ -152,7 +155,7 @@ public class Main implements SQLRequestListener {
       String password, int minConnections,
       int maxConnections, int connectionTimeout, int idleTimeout,
       int keepaliveTime, int maxLifetime, int transactionConnections) {
-    SybaseDatabase database = new SybaseDatabase(
+    final SybaseDatabase database = new SybaseDatabase(
         host, port, dbname, username, password,
         minConnections, maxConnections, connectionTimeout,
         idleTimeout, keepaliveTime, maxLifetime, transactionConnections);
@@ -161,13 +164,14 @@ public class Main implements SQLRequestListener {
       EncodedLogger.logError("Database isn't connected");
       System.exit(1);
     }
+    logConnectionSuccess(host, port, dbname);
     return database;
   }
 
   /**
    * Initializes the input reader and registers this class as listener.
    */
-  private StdInputReader initializeInputReader(boolean logEnabled) {
+  private StdInputReader initializeInputReader() {
     StdInputReader reader = new StdInputReader();
     reader.addListener(this);
     return reader;
@@ -178,7 +182,6 @@ public class Main implements SQLRequestListener {
    */
   private void logConnectionSuccess(String host, int port, String dbname) {
     EncodedLogger.log("Connected to " + host + ":" + port + "/" + dbname);
-    EncodedLogger.log("Ready to process SQL requests");
   }
 
   /**

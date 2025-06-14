@@ -6,12 +6,12 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.List;
 import java.util.Properties;
 
 import com.sybase.jdbc4.jdbc.SybDataSource;
-
 import utils.EncodedLogger;
 
 /**
@@ -33,8 +33,8 @@ public class ConnectionPoolTransaction {
   private final String databaseUrl;
   private final Properties connectionProperties;
   private final int maxTransactionConnections;
-  private final List<Connection> availableConnections;
-  private final HashMap<Integer, Connection> activeTransactionConnections;
+  private final ConcurrentSkipListSet<Connection> availableConnections;
+  private final ConcurrentHashMap<Integer, Connection> activeTransactionConnections;
 
   /**
    * Factory method to create a new ConnectionPoolTransaction instance.
@@ -56,8 +56,8 @@ public class ConnectionPoolTransaction {
     final String url = buildJdbcUrl(host, port, dbName);
     registerSybaseDriver();
 
-    Properties props = buildProperties(username, password);
-    List<Connection> initialConnections = initializeConnectionPool(url, props, transactionConnections);
+    final Properties props = buildProperties(username, password);
+    final List<Connection> initialConnections = initializeConnectionPool(url, props, transactionConnections);
 
     return new ConnectionPoolTransaction(url, props, initialConnections, transactionConnections);
   }
@@ -113,7 +113,10 @@ public class ConnectionPoolTransaction {
    * Creates a new database connection.
    */
   private static Connection createNewConnection(String url, Properties props) throws SQLException {
-    return DriverManager.getConnection(url, props);
+    final Connection connection = DriverManager.getConnection(url, props);
+    connection.setAutoCommit(false); // Disable auto-commit
+    connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+    return connection;
   }
 
   /**
@@ -129,8 +132,8 @@ public class ConnectionPoolTransaction {
       int maxTransactionConnections) {
     this.databaseUrl = url;
     this.connectionProperties = props;
-    this.availableConnections = new ArrayList<>(initialConnections);
-    this.activeTransactionConnections = new HashMap<>();
+    this.availableConnections = new ConcurrentSkipListSet<>(initialConnections);
+    this.activeTransactionConnections = new ConcurrentHashMap<>();
     this.maxTransactionConnections = maxTransactionConnections;
   }
 
@@ -145,9 +148,11 @@ public class ConnectionPoolTransaction {
     Connection connection = this.activeTransactionConnections.get(transactionId);
 
     if (connection == null) {
-      connection = !this.availableConnections.isEmpty() ? this.availableConnections.remove(0)
+      // if we don't get the transaction connection
+      // just get the first one that is already active to be used
+      // and updates its id value to match as expected
+      connection = !this.availableConnections.isEmpty() ? this.availableConnections.removeFirst()
           : createNewConnection(this.databaseUrl, this.connectionProperties);
-
       this.activeTransactionConnections.put(transactionId, connection);
     }
 
@@ -167,6 +172,24 @@ public class ConnectionPoolTransaction {
       return;
     try {
       if (!connection.isClosed()) {
+        // if this connections has not auto-commit
+        // setted to true, then we confirm all the
+        // transaction to avoid loss changes
+        if (!connection.getAutoCommit()) {
+          try {
+            connection.commit();
+          } catch (SQLException commitEx) {
+            EncodedLogger.logError("Catched error during commit transaction changes phase");
+            EncodedLogger.logException(commitEx);
+            try {
+              connection.rollback();
+            } catch (SQLException rollbackEx) {
+              EncodedLogger.logError("Rollback failed");
+              EncodedLogger.logException(rollbackEx);
+            }
+            return;
+          }
+        }
         connection.close();
       }
     } finally {
@@ -185,7 +208,6 @@ public class ConnectionPoolTransaction {
   /**
    * Shuts down the connection pool and closes all connections.
    * 
-   * @throws SQLException If any connection cannot be closed
    */
   public synchronized void shutdown() {
     // Close available connections

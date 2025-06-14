@@ -1,51 +1,47 @@
 package utils;
 
 public class EncodedLogger {
-  public static Boolean log;
+  public static Boolean log = true;
   private static final String ERROR_PREFIX = "JAVAERROR:";
   private static final String EXCEPTION_PREFIX = "JAVAEXCEPTION:";
   private static final String LOG_PREFIX = "JAVALOG:";
-  private static final StringBuffer buffer = new StringBuffer("");
 
   private EncodedLogger() {
   }
 
-  public synchronized static void logError(String str) {
-    buffer.delete(0, buffer.length());
+  public static void logError(String str) {
     if (log) {
       String message = buildStr(ERROR_PREFIX, str, "");
       if (message.length() > 1000) {
         message = message.substring(0, 1000) + " ... (truncated)";
       }
-      System.err.println(message.getBytes());
+      System.err.println(message);
     }
   }
 
-  public synchronized static void logException(Exception ex) {
-    buffer.delete(0, buffer.length());
+  public static void logException(Exception ex) {
     if (log) {
       final String message = buildStr(EXCEPTION_PREFIX, "(1)", ex.toString(), "\n", EXCEPTION_PREFIX, "(2)",
           ex.getMessage());
-      System.err.println(message.getBytes());
+      System.err.println(message);
     }
   }
 
-  public synchronized static void log(String str) {
-    buffer.delete(0, buffer.length());
+  public static void log(String str) {
     if (log) {
       String message = buildStr(LOG_PREFIX, str);
       if (message.length() > 1000) {
         message = message.substring(0, 1000) + " ... (truncated)";
       }
-      System.err.println(message.getBytes());
+      System.out.println(message);
     }
   }
 
-  private synchronized static String buildStr(String... content) {
-    buffer.delete(0, buffer.length());
+  private static String buildStr(String... content) {
+    String message = "";
     for (String str : content) {
-      buffer.append(str + " ");
+      message += (str + " ");
     }
-    return buffer.toString();
+    return message.trim();
   }
 }

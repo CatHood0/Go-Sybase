@@ -3,10 +3,9 @@ package pool;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-import utils.EncodedLogger;
-
 import java.sql.Connection;
 import java.sql.SQLException;
+import utils.EncodedLogger;
 
 /**
  * A connection pool implementation using HikariCP for high-performance database
@@ -41,7 +40,6 @@ public class ConnectionPool {
    *                          (milliseconds)
    * @param keepaliveTime     Time between keepalive checks (milliseconds)
    * @param maxLifetime       Maximum lifetime of a connection (milliseconds)
-   * @param autoCommit        Whether connections should use auto-commit mode
    * @return Configured ConnectionPool instance
    * @throws SQLException If pool initialization fails
    */

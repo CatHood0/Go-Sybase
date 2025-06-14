@@ -37,10 +37,8 @@ public class StdInputReader {
   /**
    * Constructs a new StdInputReader instance.
    * 
-   * @param logEnabled Whether to enable debug logging
    */
   public StdInputReader() {
-    EncodedLogger.log("StdInputReader initialized with logging enabled");
   }
 
   /**
@@ -61,8 +59,6 @@ public class StdInputReader {
       }
     } catch (IOException ex) {
       EncodedLogger.logException(ex);
-    } finally {
-      EncodedLogger.log("Input reader loop terminated");
     }
   }
 
@@ -72,6 +68,9 @@ public class StdInputReader {
   private void processInputLine(String inputLine) {
     // Normalize the input by removing unwanted whitespace
     String normalizedInput = normalizeInput(inputLine);
+    if (normalizedInput.isBlank()) {
+      return;
+    }
     EncodedLogger.log("Processing raw input: " + normalizedInput);
 
     try {
@@ -91,7 +90,13 @@ public class StdInputReader {
    * - Removing spaces outside quoted strings
    */
   private String normalizeInput(String input) {
-    return input.replaceAll("\\n", "\n")
+    if (input == null || input.isEmpty()) {
+      EncodedLogger.logError("Received empty input, skipping processing");
+      return "";
+    }
+
+    return input
+        .replaceAll("\\n", "\n")
         .trim()
         .replaceAll("\\s+(?=([^\"]*\"[^\"]*\")*[^\"]*$)", "");
   }
@@ -190,6 +195,7 @@ public class StdInputReader {
    * Registers a new listener to receive SQL requests.
    * 
    * @param listener The listener to add
+   * 
    * @return true if added, false if already registered
    */
   public boolean addListener(SQLRequestListener listener) {
@@ -203,7 +209,8 @@ public class StdInputReader {
   /**
    * Unregisters a listener.
    * 
-   * @param listener The listener to remove
+   * @param listener The listener to remove}
+   * 
    * @return true if removed, false if not found
    */
   public boolean removeListener(SQLRequestListener listener) {
@@ -212,6 +219,8 @@ public class StdInputReader {
 
   /**
    * Gets the number of currently registered listeners.
+   *
+   * @return number of the current listeners
    */
   public int getListenerCount() {
     return listeners.size();
